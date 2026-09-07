@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Card Grading Tracker</title>
+<style>
+:root{--bg:#0b1020;--p:#131a2e;--p2:#19223a;--t:#f6f8ff;--m:#9ca8c7;--a:#7aa2ff;--l:#2a3555}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:auto;padding:18px}.hero h1{margin-bottom:4px}.hero p{color:var(--m);margin-top:0}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat,.panel,.card{background:var(--p);border:1px solid var(--l);border-radius:16px}
+.stat{padding:14px}.stat b{display:block;font-size:20px}.stat span,.hint,.sub{color:var(--m);font-size:12px}
+.panel{padding:16px;margin-top:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.full{grid-column:1/-1}
+input,select,textarea,button{width:100%;padding:12px;border-radius:11px;border:1px solid var(--l);background:#0e1528;color:var(--t);font-size:16px}
+textarea{min-height:80px}button{background:var(--a);color:#071020;font-weight:800;border:0}.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{overflow:hidden}.photos{display:grid;grid-template-columns:1fr 1fr;gap:2px}.photos img{width:100%;aspect-ratio:3/4;object-fit:cover}
+.body{padding:14px}.title{font-size:18px;font-weight:800}.grades{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.grade{background:var(--p2);padding:10px;border-radius:11px;text-align:center}.grade b{display:block;font-size:18px}.grade span{color:var(--m);font-size:11px}
+.measure{font-size:13px;line-height:1.6}.badge{display:inline-block;background:#263354;padding:5px 9px;border-radius:999px;font-size:12px;margin-top:7px}
+.flash{padding:10px;border-radius:10px;margin:10px 0}.success{background:#173a30}.error{background:#45232c}.small{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+@media(max-width:720px){.stats,.cards,.grid{grid-template-columns:1fr 1fr}.cards{grid-template-columns:1fr}.full{grid-column:1/-1}}
+</style></head><body><div class="wrap">
+<div class="hero"><h1>Card Collection & Grading Tracker</h1><p>Photo centering · grade estimates · PSA/BGS/CGC submissions · collection value</p></div>
+{% with msgs=get_flashed_messages(with_categories=true) %}{% for cat,msg in msgs %}<div class="flash {{cat}}">{{msg}}</div>{% endfor %}{% endwith %}
+<div class="stats">
+<div class="stat"><b>{{totals.n}}</b><span>Cards</span></div>
+<div class="stat"><b>${{'%.2f'|format(totals.invested)}}</b><span>Invested</span></div>
+<div class="stat"><b>${{'%.2f'|format(totals.fees)}}</b><span>Grading fees</span></div>
+<div class="stat"><b>${{'%.2f'|format(totals.value)}}</b><span>Current value</span></div>
+</div>
+<div class="panel"><h2>Add card + estimate grade</h2>
+<form class="grid" action="/add" method="post" enctype="multipart/form-data">
+<input name="name" placeholder="Card name" required><input name="set_name" placeholder="Set">
+<input name="card_number" placeholder="Card number"><input name="language" value="English">
+<input name="purchase_price" type="number" step="0.01" placeholder="Purchase price"><input name="market_value" type="number" step="0.01" placeholder="Market value">
+<input name="grading_fee" type="number" step="0.01" placeholder="Expected grading fee">
+<select name="grading_company"><option value="">Grading company</option><option>PSA</option><option>BGS</option><option>CGC</option></select>
+<select name="submission_status"><option>Raw</option><option>Inspecting</option><option>Ready to Submit</option><option>Submitted</option><option>Graded</option><option>Returned</option></select><div></div>
+<div><label>Front photo</label><input name="front_image" type="file" accept="image/*" capture="environment"></div>
+<div><label>Back photo</label><input name="back_image" type="file" accept="image/*" capture="environment"></div>
+<div class="full hint">Best results: card flat, camera directly above, full card visible, even lighting, minimal glare.</div>
+<select name="corners_score"><option value="">Corners score (optional)</option>{% for x in [10,9.5,9,8.5,8,7.5,7] %}<option>{{x}}</option>{% endfor %}</select>
+<select name="edges_score"><option value="">Edges score (optional)</option>{% for x in [10,9.5,9,8.5,8,7.5,7] %}<option>{{x}}</option>{% endfor %}</select>
+<select name="surface_score"><option value="">Surface score (optional)</option>{% for x in [10,9.5,9,8.5,8,7.5,7] %}<option>{{x}}</option>{% endfor %}</select><div></div>
+<textarea class="full" name="notes" placeholder="Notes: print lines, whitening, scratches, dents, holo issues..."></textarea>
+<button class="full">Analyze & Add Card</button></form>
+<p class="hint">Estimates are not official grades or guarantees. Surface/corner defects often require close-up and angled photos.</p></div>
+
+<div class="panel"><h2>Collection</h2><div class="cards">
+{% for c in cards %}<div class="card">
+{% if c.front_image or c.back_image %}<div class="photos">
+{% if c.front_image %}<img src="{{url_for('static',filename='uploads/'+c.front_image)}}">{% endif %}
+{% if c.back_image %}<img src="{{url_for('static',filename='uploads/'+c.back_image)}}">{% endif %}
+</div>{% endif %}
+<div class="body"><div class="title">{{c.name}}</div><div class="sub">{{c.set_name or 'No set'}}{% if c.card_number %} · #{{c.card_number}}{% endif %}</div>
+<span class="badge">{{c.submission_status}}</span>
+<div class="grades"><div class="grade"><b>{{c.estimated_psa if c.estimated_psa is not none else '—'}}</b><span>Est. PSA</span></div>
+<div class="grade"><b>{{c.estimated_bgs if c.estimated_bgs is not none else '—'}}</b><span>Est. BGS</span></div>
+<div class="grade"><b>{{c.black_label_chance or '—'}}</b><span>Black Label</span></div></div>
+<div class="measure"><strong>Centering:</strong> {{c.centering_score or '—'}}<br>
+<strong>Front L/R:</strong> {{c.front_lr or '—'}} · <strong>T/B:</strong> {{c.front_tb or '—'}}<br>
+<strong>Back L/R:</strong> {{c.back_lr or '—'}} · <strong>T/B:</strong> {{c.back_tb or '—'}}<br>
+<strong>Photo confidence:</strong> {{('%.0f%%'|format((c.confidence or 0)*100)) if c.confidence else '—'}}<br>
+<strong>Investment:</strong> ${{'%.2f'|format(c.purchase_price+c.grading_fee)}} · <strong>Value:</strong> ${{'%.2f'|format(c.market_value)}}</div>
+<form class="small" action="/card/{{c.id}}/update" method="post">
+<select name="grading_company"><option>{{c.grading_company or 'Company'}}</option><option>PSA</option><option>BGS</option><option>CGC</option></select>
+<select name="submission_status">{% for s in ['Raw','Inspecting','Ready to Submit','Submitted','Graded','Returned'] %}<option {% if c.submission_status==s %}selected{% endif %}>{{s}}</option>{% endfor %}</select>
+<input name="cert_number" value="{{c.cert_number or ''}}" placeholder="Cert #"><input name="actual_grade" value="{{c.actual_grade or ''}}" placeholder="Actual grade">
+<input name="market_value" value="{{c.market_value or 0}}" type="number" step="0.01"><input name="notes" value="{{c.notes or ''}}" placeholder="Notes">
+<button class="full">Update submission</button></form>
+<form action="/card/{{c.id}}/delete" method="post" style="margin-top:8px"><button style="background:#43202a;color:#ffc2c8">Delete card</button></form>
+</div></div>{% else %}<p class="hint">No cards yet.</p>{% endfor %}</div></div>
+</div></body></html>
